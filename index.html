@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Org Chart Animado</title>
+  <style>
+    :root{ --bg1:#e6f7fb; --accent:#21a6d3; --card:#ffffff; --muted:#6b7280 }
+    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:linear-gradient(180deg,var(--bg1),#ffffff 60%)}
+    .wrap{max-width:1200px;margin:32px auto;padding:24px}
+    h1{font-size:20px;margin:0 0 16px;color:#05445E}
+    .board{position:relative;padding:22px;background:transparent;border-radius:12px;min-height:420px}
+    .columns{display:flex;gap:28px;align-items:flex-start;justify-content:center}
+    .column{flex:1;min-width:260px}
+    .node{background:var(--card);border-radius:10px;padding:10px 12px;box-shadow:0 6px 18px rgba(3,27,38,0.06);border:3px solid rgba(33,166,211,0.08);text-align:center;cursor:pointer;opacity:0;transform:translateY(14px);}
+    .node .code{font-weight:700;color:#05445E;font-size:13px}
+    .node .desc{font-size:11px;color:var(--muted);margin-top:6px}
+    .node:hover{transform:translateY(0);box-shadow:0 10px 26px rgba(3,27,38,0.12)}
+    .children{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px}
+    .child{width:170px}
+    @keyframes popIn{from{opacity:0;transform:translateY(18px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)}}
+    .node.anim{animation:popIn .55s cubic-bezier(.2,.9,.2,1) forwards}
+    .column.collapsed .children{display:none}
+    svg.connectors{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+    line.connector{stroke:rgba(2,114,160,0.9);stroke-width:3;opacity:0;transform:translateY(-8px);transition:opacity .4s ease,transform .45s cubic-bezier(.2,.9,.2,1)}
+    line.connector.show{opacity:1;transform:translateY(0)}
+    .controls{display:flex;gap:8px;align-items:center;margin-top:12px}
+    .btn{background:var(--accent);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+    .hint{font-size:12px;color:var(--muted)}
+    @media (max-width:880px){.columns{flex-direction:column;gap:18px}.child{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Diagrama animado — haz clic en un bloque para mostrar/ocultar sus hijos</h1>
+    <div class="board" id="board">
+      <svg class="connectors" id="svg"></svg>
+      <div class="columns" id="columns"></div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="playAll">Reproducir animación</button>
+      <div class="hint">Abre este archivo en tu navegador y graba la pantalla para insertarlo como video en PowerPoint Online.</div>
+    </div>
+  </div>
+
+  <script>
+    const data = [
+      {
+        id:'CD-P-017',
+        title:'CD-P-017',
+        subtitle:'Recepción y Almacenaje de Mercadería',
+        children:[
+          {id:'CD-P-004', title:'CD-P-004', subtitle:'Recepción y Almacenamiento'},
+          {id:'CD-P-017-2', title:'CD-P-017', subtitle:'Recepción y Almacenaje de Mercadería'},
+          {id:'CD-P-023', title:'CD-P-023', subtitle:'Recepción y Almacenaje de Mercadería'}
+        ]
+      },
+      {
+        id:'CD-P-002',
+        title:'CD-P-002',
+        subtitle:'Planificación y picking de mercadería',
+        children:[
+          {id:'CD-P-002-1', title:'CD-P-002', subtitle:'Planificación y picking de mercadería'},
+          {id:'CD-P-006', title:'CD-P-006', subtitle:'Picking y reposición'},
+          {id:'CD-P-024', title:'CD-P-024', subtitle:'Planificación y picking de mercadería'},
+          {id:'CD-P-005', title:'CD-P-005', subtitle:'Planning'}
+        ]
+      },
+      {
+        id:'CD-P-007',
+        title:'CD-P-007',
+        subtitle:'Despacho de Mercadería',
+        children:[
+          {id:'CD-P-003', title:'CD-P-003', subtitle:'Despacho de mercadería y embalaje'},
+          {id:'CD-P-007-1', title:'CD-P-007', subtitle:'Despacho de Mercadería'},
+          {id:'CD-P-025', title:'CD-P-025', subtitle:'Despacho de mercadería y embalaje'}
+        ]
+      }
+    ];
+
+    const columnsEl = document.getElementById('columns');
+    const svg = document.getElementById('svg');
+
+    function createNodeBox(item, cls = 'node'){
+      const node = document.createElement('div');
+      node.className = cls;
+      node.dataset.id = item.id;
+      node.innerHTML = `<div class="code">${item.id}</div><div class="desc">${item.subtitle}</div>`;
+      return node;
+    }
+
+    function render(){
+      columnsEl.innerHTML = '';
+      data.forEach((group)=>{
+        const col = document.createElement('div');
+        col.className = 'column';
+        const parent = createNodeBox(group);
+        parent.addEventListener('click', ()=>{
+          col.classList.toggle('collapsed');
+          requestAnimationFrame(drawConnectors);
+        });
+        const kids = document.createElement('div');
+        kids.className = 'children';
+        group.children.forEach((c)=>{
+          const ch = createNodeBox(c,'node child');
+          ch.classList.add('child');
+          kids.appendChild(ch);
+        });
+        col.appendChild(parent);
+        col.appendChild(kids);
+        columnsEl.appendChild(col);
+      });
+
+      const allNodes = document.querySelectorAll('.node');
+      allNodes.forEach((n, idx)=>{
+        n.classList.remove('anim');
+        n.style.animationDelay = (idx * 120) + 'ms';
+      });
+      setTimeout(()=>{
+        allNodes.forEach(n=>n.classList.add('anim'));
+        setTimeout(()=> drawConnectors(true), 350);
+      },50);
+    }
+
+    function drawConnectors(showImmediate=false){
+      const boardRect = document.getElementById('board').getBoundingClientRect();
+      svg.innerHTML = '';
+      const cols = document.querySelectorAll('.column');
+      cols.forEach(col=>{
+        const parent = col.querySelector(':scope > .node');
+        const children = col.querySelectorAll(':scope .children .node');
+        if(!parent || children.length===0) return;
+        const pRect = parent.getBoundingClientRect();
+        children.forEach(child=>{
+          if(col.classList.contains('collapsed')) return;
+          const cRect = child.getBoundingClientRect();
+          const x1 = pRect.left + pRect.width/2 - boardRect.left;
+          const y1 = pRect.bottom - boardRect.top;
+          const x2 = cRect.left + cRect.width/2 - boardRect.left;
+          const y2 = cRect.top - boardRect.top;
+          const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+          line.setAttribute('x1',x1);
+          line.setAttribute('y1',y1);
+          line.setAttribute('x2',x2);
+          line.setAttribute('y2',y2);
+          line.classList.add('connector');
+          svg.appendChild(line);
+          const delay = 300 + (Array.from(children).indexOf(child) * 120);
+          setTimeout(()=> line.classList.add('show'), showImmediate ? 0 : delay);
+        });
+      });
+    }
+
+    window.addEventListener('resize', ()=> drawConnectors(true));
+    window.addEventListener('orientationchange', ()=> drawConnectors(true));
+
+    document.getElementById('playAll').addEventListener('click', ()=>{
+      const nodes = document.querySelectorAll('.node');
+      nodes.forEach(n=>{n.classList.remove('anim');});
+      setTimeout(()=>{nodes.forEach(n=>n.classList.add('anim')); drawConnectors();},60);
+    });
+
+    render();
+  </script>
+</body>
+</html>
